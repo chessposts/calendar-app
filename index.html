@@ -320,6 +320,45 @@
             font-style: italic;
         }
 
+        .brain-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 999;
+            transition: transform 0.2s;
+        }
+
+        .brain-button:hover {
+            transform: scale(1.1);
+        }
+
+        .quote-modal .modal-content {
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .quote-text {
+            font-size: 1.2em;
+            font-style: italic;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .quote-author {
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: bold;
+        }
+
         @media (max-width: 1024px) {
             .main-content {
                 grid-template-columns: 1fr;
@@ -348,6 +387,9 @@
     </style>
 </head>
 <body>
+    <!-- Brain Button -->
+    <button class="brain-button" onclick="showRandomQuote()" title="Get inspired!">🧠</button>
+
     <!-- Name Input Modal -->
     <div class="modal" id="nameModal">
         <div class="modal-content">
@@ -355,6 +397,16 @@
             <p style="text-align: center; margin-bottom: 20px; color: #666;">What's your name?</p>
             <input type="text" id="nameInput" placeholder="Enter your name" autofocus>
             <button onclick="saveName()">Get Started</button>
+        </div>
+    </div>
+
+    <!-- Quote Modal -->
+    <div class="modal quote-modal" id="quoteModal">
+        <div class="modal-content">
+            <h2>💭 Wisdom</h2>
+            <p class="quote-text" id="quoteText"></p>
+            <p class="quote-author">— Bertrand Russell</p>
+            <button onclick="closeQuote()">Close</button>
         </div>
     </div>
 
@@ -417,6 +469,30 @@
             { id: 'late_morning', label: 'Late AM', time: '10am-12pm' },
             { id: 'afternoon', label: 'Afternoon', time: '12-5pm' },
             { id: 'evening', label: 'Evening', time: '5-10pm' }
+        ];
+
+        // Bertrand Russell quotes
+        const RUSSELL_QUOTES = [
+            "The whole problem with the world is that fools and fanatics are always so certain of themselves, and wiser people so full of doubts.",
+            "Do not fear to be eccentric in opinion, for every opinion now accepted was once eccentric.",
+            "The good life is one inspired by love and guided by knowledge.",
+            "In all affairs it's a healthy thing now and then to hang a question mark on the things you have long taken for granted.",
+            "The fundamental cause of trouble in the world today is that the stupid are cocksure while the intelligent are full of doubt.",
+            "Three passions have governed my life: the longing for love, the search for knowledge, and unbearable pity for the suffering of humankind.",
+            "The only thing that will redeem mankind is cooperation.",
+            "Science is what you know, philosophy is what you don't know.",
+            "War does not determine who is right — only who is left.",
+            "To be without some of the things you want is an indispensable part of happiness.",
+            "The time you enjoy wasting is not wasted time.",
+            "It is the preoccupation with possessions, more than anything else, that prevents us from living freely and nobly.",
+            "Men are born ignorant, not stupid. They are made stupid by education.",
+            "The degree of one's emotions varies inversely with one's knowledge of the facts.",
+            "There is much pleasure to be gained from useless knowledge.",
+            "One of the symptoms of an approaching nervous breakdown is the belief that one's work is terribly important.",
+            "The secret of happiness is to face the fact that the world is horrible, horrible, horrible.",
+            "I would never die for my beliefs because I might be wrong.",
+            "To teach how to live without certainty, and yet without being paralyzed by hesitation, is perhaps the chief thing that philosophy can do.",
+            "Advocates of capitalism are very apt to appeal to the sacred principles of liberty, which are embodied in one maxim: The fortunate must not be restrained in the exercise of tyranny over the unfortunate."
         ];
 
         // Global state
@@ -709,6 +785,17 @@
         function changeMonth(delta) {
             currentDate.setMonth(currentDate.getMonth() + delta);
             renderCalendar();
+        }
+
+        function showRandomQuote() {
+            const randomIndex = Math.floor(Math.random() * RUSSELL_QUOTES.length);
+            const quote = RUSSELL_QUOTES[randomIndex];
+            document.getElementById('quoteText').textContent = `"${quote}"`;
+            document.getElementById('quoteModal').classList.add('active');
+        }
+
+        function closeQuote() {
+            document.getElementById('quoteModal').classList.remove('active');
         }
 
         // Handle Enter key in name input
