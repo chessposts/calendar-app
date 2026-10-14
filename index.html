@@ -134,7 +134,6 @@
             min-height: 140px;
             background: #fafafa;
             cursor: pointer;
-            transition: all 0.3s;
         }
 
         .day-cell.empty {
@@ -145,8 +144,6 @@
 
         .day-cell:not(.empty):hover {
             border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
         }
 
         .day-number {
@@ -163,12 +160,11 @@
             font-size: 0.75em;
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s;
             border: 1px solid transparent;
         }
 
         .time-slot:hover {
-            transform: scale(1.05);
+            opacity: 0.8;
         }
 
         .time-slot.selected-by-me {
@@ -395,7 +391,7 @@
         // Supabase Configuration
         const SUPABASE_URL = 'https://xvgdgbvjmkomewhfgsxn.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2Z2RnYnZqbWtvbWV3aGZnc3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMDMxOTksImV4cCI6MjEwNzU3OTE5OX0.zK-2X4S61Kn4eOnPP3R1w4Vp0vBfF3G2xmnQxf-roM4';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         // Time slot configuration
         const TIME_SLOTS = [
@@ -409,6 +405,7 @@
         let currentUser = null;
         let currentDate = new Date();
         let allAvailability = [];
+        let isUpdating = false;
 
         // Initialize app
         async function init() {
@@ -436,7 +433,7 @@
             }
 
             // Create user in Supabase
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('users')
                 .insert([{ name }])
                 .select()
@@ -459,7 +456,7 @@
 
         async function loadData() {
             // Load all availability
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('availability')
                 .select(`
                     *,
@@ -477,12 +474,15 @@
         }
 
         function subscribeToChanges() {
-            supabase
+            supabaseClient
                 .channel('availability-changes')
                 .on('postgres_changes',
                     { event: '*', schema: 'public', table: 'availability' },
                     () => {
-                        loadData();
+                        // Don't reload if we're currently updating
+                        if (!isUpdating) {
+                            loadData();
+                        }
                     }
                 )
                 .subscribe();
@@ -559,6 +559,9 @@
         async function toggleSlot(date, timeSlot) {
             if (!currentUser) return;
 
+            // Set updating flag
+            isUpdating = true;
+
             // Check if already selected by current user
             const existing = allAvailability.find(a =>
                 a.user_id === currentUser.id &&
@@ -566,34 +569,54 @@
                 a.time_slot === timeSlot
             );
 
+            // Optimistically update UI immediately
             if (existing) {
-                // Remove selection
-                const { error } = await supabase
+                allAvailability = allAvailability.filter(a => a.id !== existing.id);
+            } else {
+                allAvailability.push({
+                    id: 'temp-' + Date.now(),
+                    user_id: currentUser.id,
+                    date: date,
+                    time_slot: timeSlot,
+                    users: { name: currentUser.name }
+                });
+            }
+            renderCalendar();
+            renderOverlaps();
+
+            // Then update database in background
+            if (existing) {
+                const { error } = await supabaseClient
                     .from('availability')
                     .delete()
                     .eq('id', existing.id);
 
                 if (error) {
                     console.error('Error removing availability:', error);
-                    return;
+                    await loadData(); // Reload on error
                 }
             } else {
-                // Add selection
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('availability')
-                    .insert([{
+                    .upsert([{
                         user_id: currentUser.id,
                         date: date,
                         time_slot: timeSlot
-                    }]);
+                    }], {
+                        onConflict: 'user_id,date,time_slot',
+                        ignoreDuplicates: false
+                    });
 
                 if (error) {
                     console.error('Error adding availability:', error);
-                    return;
+                    await loadData(); // Reload on error
                 }
             }
 
-            // Reload will happen via real-time subscription
+            // Clear updating flag after a short delay
+            setTimeout(() => {
+                isUpdating = false;
+            }, 500);
         }
 
         function renderOverlaps() {
