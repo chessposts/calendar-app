@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Availability App</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .user-info {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .calendar-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .overlap-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header h2 {
+            color: #333;
+            font-size: 1.8em;
+        }
+
+        .month-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .month-nav button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+
+        .month-nav button:hover {
+            background: #5568d3;
+        }
+
+        .time-slots-legend {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+
+        .day-header {
+            text-align: center;
+            font-weight: bold;
+            color: #667eea;
+            padding: 10px;
+        }
+
+        .day-cell {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px;
+            min-height: 140px;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .day-cell.empty {
+            background: transparent;
+            border: none;
+            cursor: default;
+        }
+
+        .day-cell:not(.empty):hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .time-slot {
+            padding: 4px;
+            margin: 3px 0;
+            border-radius: 4px;
+            font-size: 0.75em;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .time-slot:hover {
+            transform: scale(1.05);
+        }
+
+        .time-slot.selected-by-me {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .time-slot.selected-by-others {
+            background: #e8eaf6;
+            border-color: #9fa8da;
+        }
+
+        .time-slot.overlap {
+            background: #4caf50;
+            color: white;
+            font-weight: bold;
+        }
+
+        .time-slot.high-overlap {
+            background: #ff9800;
+            color: white;
+            font-weight: bold;
+        }
+
+        .overlap-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .overlap-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .overlap-date {
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .overlap-time {
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            opacity: 0.95;
+        }
+
+        .overlap-users {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .overlap-count {
+            display: inline-block;
+            background: rgba(255,255,255,0.3);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h2 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            margin-bottom: 20px;
+            transition: border 0.3s;
+        }
+
+        .modal-content input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-content button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .modal-content button:hover {
+            background: #5568d3;
+        }
+
+        .no-overlaps {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-style: italic;
+        }
+
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .overlap-section {
+                max-height: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .calendar-grid {
+                gap: 5px;
+            }
+
+            .day-cell {
+                min-height: 120px;
+                padding: 5px;
+            }
+
+            .time-slot {
+                font-size: 0.7em;
+                padding: 3px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Name Input Modal -->
+    <div class="modal" id="nameModal">
+        <div class="modal-content">
+            <h2>Welcome! 👋</h2>
+            <p style="text-align: center; margin-bottom: 20px; color: #666;">What's your name?</p>
+            <input type="text" id="nameInput" placeholder="Enter your name" autofocus>
+            <button onclick="saveName()">Get Started</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>📅 Calendar Availability</h1>
+        <div class="user-info">
+            Logged in as: <strong id="currentUserName"></strong>
+        </div>
+
+        <div class="main-content">
+            <!-- Calendar Section -->
+            <div class="calendar-section">
+                <div class="calendar-header">
+                    <h2 id="currentMonth"></h2>
+                    <div class="month-nav">
+                        <button onclick="changeMonth(-1)">← Previous</button>
+                        <button onclick="changeMonth(1)">Next →</button>
+                    </div>
+                </div>
+
+                <div class="time-slots-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #667eea;"></div>
+                        <span>Your selection</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #e8eaf6; border: 1px solid #9fa8da;"></div>
+                        <span>Others</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4caf50;"></div>
+                        <span>2-3 people</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ff9800;"></div>
+                        <span>4+ people</span>
+                    </div>
+                </div>
+
+                <div class="calendar-grid" id="calendarGrid"></div>
+            </div>
+
+            <!-- Best Overlaps Section -->
+            <div class="overlap-section">
+                <h2>🎯 Best Times</h2>
+                <div id="overlapList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase Configuration
+        const SUPABASE_URL = 'https://xvgdgbvjmkomewhfgsxn.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2Z2RnYnZqbWtvbWV3aGZnc3huIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMDMxOTksImV4cCI6MjEwNzU3OTE5OX0.zK-2X4S61Kn4eOnPP3R1w4Vp0vBfF3G2xmnQxf-roM4';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Time slot configuration
+        const TIME_SLOTS = [
+            { id: 'morning', label: 'Morning', time: '6-10am' },
+            { id: 'late_morning', label: 'Late AM', time: '10am-12pm' },
+            { id: 'afternoon', label: 'Afternoon', time: '12-5pm' },
+            { id: 'evening', label: 'Evening', time: '5-10pm' }
+        ];
+
+        // Global state
+        let currentUser = null;
+        let currentDate = new Date();
+        let allAvailability = [];
+
+        // Initialize app
+        async function init() {
+            // Check if user exists in localStorage
+            const storedUserId = localStorage.getItem('userId');
+            const storedUserName = localStorage.getItem('userName');
+
+            if (storedUserId && storedUserName) {
+                currentUser = { id: storedUserId, name: storedUserName };
+                document.getElementById('currentUserName').textContent = storedUserName;
+                await loadData();
+            } else {
+                document.getElementById('nameModal').classList.add('active');
+            }
+
+            // Subscribe to real-time updates
+            subscribeToChanges();
+        }
+
+        async function saveName() {
+            const name = document.getElementById('nameInput').value.trim();
+            if (!name) {
+                alert('Please enter your name');
+                return;
+            }
+
+            // Create user in Supabase
+            const { data, error } = await supabase
+                .from('users')
+                .insert([{ name }])
+                .select()
+                .single();
+
+            if (error) {
+                console.error('Error creating user:', error);
+                alert('Error creating user. Please try again.');
+                return;
+            }
+
+            currentUser = data;
+            localStorage.setItem('userId', data.id);
+            localStorage.setItem('userName', data.name);
+            document.getElementById('currentUserName').textContent = data.name;
+            document.getElementById('nameModal').classList.remove('active');
+
+            await loadData();
+        }
+
+        async function loadData() {
+            // Load all availability
+            const { data, error } = await supabase
+                .from('availability')
+                .select(`
+                    *,
+                    users (name)
+                `);
+
+            if (error) {
+                console.error('Error loading availability:', error);
+                return;
+            }
+
+            allAvailability = data;
+            renderCalendar();
+            renderOverlaps();
+        }
+
+        function subscribeToChanges() {
+            supabase
+                .channel('availability-changes')
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'availability' },
+                    () => {
+                        loadData();
+                    }
+                )
+                .subscribe();
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            // Update month display
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+            // Get first day and number of days in month
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Build calendar grid
+            let html = '';
+
+            // Day headers
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayNames.forEach(day => {
+                html += `<div class="day-header">${day}</div>`;
+            });
+
+            // Empty cells before first day
+            for (let i = 0; i < firstDay; i++) {
+                html += '<div class="day-cell empty"></div>';
+            }
+
+            // Day cells
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                html += `<div class="day-cell">
+                    <div class="day-number">${day}</div>
+                    ${renderTimeSlots(dateStr)}
+                </div>`;
+            }
+
+            document.getElementById('calendarGrid').innerHTML = html;
+        }
+
+        function renderTimeSlots(dateStr) {
+            let html = '';
+            TIME_SLOTS.forEach(slot => {
+                const availability = allAvailability.filter(a =>
+                    a.date === dateStr && a.time_slot === slot.id
+                );
+
+                const selectedByMe = availability.some(a => a.user_id === currentUser.id);
+                const selectedByOthers = availability.filter(a => a.user_id !== currentUser.id);
+                const totalCount = availability.length;
+
+                let className = 'time-slot';
+                if (selectedByMe) {
+                    className += ' selected-by-me';
+                } else if (totalCount >= 4) {
+                    className += ' high-overlap';
+                } else if (totalCount >= 2) {
+                    className += ' overlap';
+                } else if (selectedByOthers.length > 0) {
+                    className += ' selected-by-others';
+                }
+
+                html += `<div class="${className}" onclick="toggleSlot('${dateStr}', '${slot.id}')" title="${slot.label} (${slot.time})">
+                    ${slot.label}${totalCount > 0 ? ' (' + totalCount + ')' : ''}
+                </div>`;
+            });
+            return html;
+        }
+
+        async function toggleSlot(date, timeSlot) {
+            if (!currentUser) return;
+
+            // Check if already selected by current user
+            const existing = allAvailability.find(a =>
+                a.user_id === currentUser.id &&
+                a.date === date &&
+                a.time_slot === timeSlot
+            );
+
+            if (existing) {
+                // Remove selection
+                const { error } = await supabase
+                    .from('availability')
+                    .delete()
+                    .eq('id', existing.id);
+
+                if (error) {
+                    console.error('Error removing availability:', error);
+                    return;
+                }
+            } else {
+                // Add selection
+                const { error } = await supabase
+                    .from('availability')
+                    .insert([{
+                        user_id: currentUser.id,
+                        date: date,
+                        time_slot: timeSlot
+                    }]);
+
+                if (error) {
+                    console.error('Error adding availability:', error);
+                    return;
+                }
+            }
+
+            // Reload will happen via real-time subscription
+        }
+
+        function renderOverlaps() {
+            // Group by date and time slot
+            const grouped = {};
+
+            allAvailability.forEach(a => {
+                const key = `${a.date}|${a.time_slot}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        date: a.date,
+                        timeSlot: a.time_slot,
+                        users: []
+                    };
+                }
+                grouped[key].users.push(a.users.name);
+            });
+
+            // Convert to array and sort by user count (descending)
+            const overlaps = Object.values(grouped)
+                .filter(g => g.users.length >= 2)
+                .sort((a, b) => b.users.length - a.users.length);
+
+            let html = '';
+            if (overlaps.length === 0) {
+                html = '<div class="no-overlaps">No overlapping availability yet.<br>Start selecting your available times!</div>';
+            } else {
+                overlaps.forEach(overlap => {
+                    const slot = TIME_SLOTS.find(s => s.id === overlap.timeSlot);
+                    const dateObj = new Date(overlap.date + 'T00:00:00');
+                    const formattedDate = dateObj.toLocaleDateString('en-US', {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+
+                    html += `
+                        <div class="overlap-item">
+                            <div class="overlap-count">${overlap.users.length} people available</div>
+                            <div class="overlap-date">${formattedDate}</div>
+                            <div class="overlap-time">${slot.label} (${slot.time})</div>
+                            <div class="overlap-users">${overlap.users.join(', ')}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            document.getElementById('overlapList').innerHTML = html;
+        }
+
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        // Handle Enter key in name input
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('nameInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveName();
+            });
+        });
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html>
