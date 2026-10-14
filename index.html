@@ -153,6 +153,24 @@
             font-size: 1.1em;
         }
 
+        .day-number.today {
+            color: #ff3b3b;
+            background: #ffe6e6;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .day-cell.past {
+            opacity: 0.4;
+            cursor: not-allowed;
+            background: #f5f5f5;
+        }
+
+        .day-cell.past .time-slot {
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         .time-slot {
             padding: 4px;
             margin: 3px 0;
@@ -423,6 +441,13 @@
 
             // Subscribe to real-time updates
             subscribeToChanges();
+
+            // Auto-refresh every 5 seconds
+            setInterval(() => {
+                if (!isUpdating) {
+                    loadData();
+                }
+            }, 5000);
         }
 
         async function saveName() {
@@ -501,6 +526,10 @@
             const firstDay = new Date(year, month, 1).getDay();
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+            // Get today's date for comparison
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
             // Build calendar grid
             let html = '';
 
@@ -518,16 +547,23 @@
             // Day cells
             for (let day = 1; day <= daysInMonth; day++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                html += `<div class="day-cell">
-                    <div class="day-number">${day}</div>
-                    ${renderTimeSlots(dateStr)}
+                const cellDate = new Date(year, month, day);
+                const isToday = cellDate.getTime() === today.getTime();
+                const isPast = cellDate < today;
+
+                const cellClass = isPast ? 'day-cell past' : 'day-cell';
+                const dayClass = isToday ? 'day-number today' : 'day-number';
+
+                html += `<div class="${cellClass}">
+                    <div class="${dayClass}">${day}</div>
+                    ${renderTimeSlots(dateStr, isPast)}
                 </div>`;
             }
 
             document.getElementById('calendarGrid').innerHTML = html;
         }
 
-        function renderTimeSlots(dateStr) {
+        function renderTimeSlots(dateStr, isPast) {
             let html = '';
             TIME_SLOTS.forEach(slot => {
                 const availability = allAvailability.filter(a =>
@@ -549,7 +585,10 @@
                     className += ' selected-by-others';
                 }
 
-                html += `<div class="${className}" onclick="toggleSlot('${dateStr}', '${slot.id}')" title="${slot.label} (${slot.time})">
+                // Only add onclick if not a past date
+                const onclickAttr = isPast ? '' : `onclick="toggleSlot('${dateStr}', '${slot.id}')"`;
+
+                html += `<div class="${className}" ${onclickAttr} title="${slot.label} (${slot.time})">
                     ${slot.label}${totalCount > 0 ? ' (' + totalCount + ')' : ''}
                 </div>`;
             });
